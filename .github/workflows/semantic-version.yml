@@ -42,14 +42,6 @@ jobs:
             build:patch,
             ci:patch
 
-      - name: Create and push tag
-        if: steps.version.outputs.new_tag
-        uses: mathieudutour/github-tag-action@v6.2
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          custom_tag: ${{ steps.version.outputs.new_tag }}
-          tag_prefix: v
-
       - name: Check if this is first release
         id: check_previous_tag
         run: |
@@ -59,14 +51,24 @@ jobs:
             echo "is_first_release=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Generate changelog
+      - name: Generate changelog from commits
         id: changelog
         if: steps.check_previous_tag.outputs.is_first_release == 'false'
-        uses: requarks/changelog-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.version.outputs.new_tag }}
-          excludeTypes: build,docs,style,other
+        run: |
+          PREVIOUS_TAG="${{ steps.version.outputs.previous_tag }}"
+          CHANGELOG=""
+          
+          # Get commit messages between previous tag and HEAD
+          while IFS= read -r commit; do
+            if [[ -n "$commit" ]]; then
+              CHANGELOG="${CHANGELOG}- ${commit}"$'\n'
+            fi
+          done < <(git log "${PREVIOUS_TAG}..HEAD" --pretty=format:"%s" --reverse)
+          
+          # Set multiline output
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Get commits for first release
         id: first_release_commits
@@ -77,6 +79,14 @@ jobs:
           echo "$COMMITS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Create and push tag
+        if: steps.version.outputs.new_tag
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: ${{ steps.version.outputs.new_tag }}
+          tag_prefix: v
+
       - name: Create Release
         if: steps.version.outputs.new_tag
         uses: ncipollo/release-action@v1
@@ -85,9 +95,9 @@ jobs:
           name: Release ${{ steps.version.outputs.new_tag }}
           body: |
             ## What's Changed
-            ${{ steps.check_previous_tag.outputs.is_first_release == 'true' && steps.first_release_commits.outputs.commits || steps.changelog.outputs.changes }}
+            ${{ steps.check_previous_tag.outputs.is_first_release == 'true' && steps.first_release_commits.outputs.commits || steps.changelog.outputs.changelog }}
             
-            ${{ steps.check_previous_tag.outputs.is_first_release == 'false' && format('**Full Changelog**: {0}...{1}', steps.version.outputs.previous_tag, steps.version.outputs.new_tag) || '**Initial Release**' }}
+            ${{ steps.check_previous_tag.outputs.is_first_release == 'false' && format('**Full Changelog**: https://github.com/{0}/compare/{1}...{2}', github.repository, steps.version.outputs.previous_tag, steps.version.outputs.new_tag) || '**Initial Release**' }}
           makeLatest: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
