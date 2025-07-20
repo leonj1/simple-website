@@ -68,12 +68,22 @@ tf-build:
 	@docker build -f Dockerfile.terraform -t $(TF_IMAGE) .
 
 tf-init: tf-build
-	@echo "Initializing Terraform..."
+	@echo "Initializing Terraform (workspace: local)..."
 	@docker run --rm \
 		--network $(LOCALSTACK_NETWORK) \
 		-v "$(PWD)/$(TF_DIR):/workspace" \
 		-e LOCALSTACK_AUTH_TOKEN=$(LOCALSTACK_AUTH_TOKEN) \
 		$(TF_IMAGE) init
+	@docker run --rm \
+		--network $(LOCALSTACK_NETWORK) \
+		-v "$(PWD)/$(TF_DIR):/workspace" \
+		-e LOCALSTACK_AUTH_TOKEN=$(LOCALSTACK_AUTH_TOKEN) \
+		$(TF_IMAGE) workspace new local || true
+	@docker run --rm \
+		--network $(LOCALSTACK_NETWORK) \
+		-v "$(PWD)/$(TF_DIR):/workspace" \
+		-e LOCALSTACK_AUTH_TOKEN=$(LOCALSTACK_AUTH_TOKEN) \
+		$(TF_IMAGE) workspace select local
 
 tf-plan: tf-init
 	@echo "Planning Terraform changes..."
@@ -126,7 +136,7 @@ tf-prod-build:
 	@docker build -f Dockerfile.terraform.prod -t $(TF_PROD_IMAGE) .
 
 tf-prod-init: tf-prod-build
-	@echo "Initializing Terraform for production..."
+	@echo "Initializing Terraform for production (workspace: prod)..."
 	@docker run --rm \
 		-v "$(PWD)/$(TF_DIR):/workspace" \
 		-e AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) \
@@ -134,6 +144,20 @@ tf-prod-init: tf-prod-build
 		-e AWS_SESSION_TOKEN=$(AWS_SESSION_TOKEN) \
 		-e AWS_REGION=$(AWS_REGION) \
 		$(TF_PROD_IMAGE) init
+	@docker run --rm \
+		-v "$(PWD)/$(TF_DIR):/workspace" \
+		-e AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) \
+		-e AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY) \
+		-e AWS_SESSION_TOKEN=$(AWS_SESSION_TOKEN) \
+		-e AWS_REGION=$(AWS_REGION) \
+		$(TF_PROD_IMAGE) workspace new prod || true
+	@docker run --rm \
+		-v "$(PWD)/$(TF_DIR):/workspace" \
+		-e AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) \
+		-e AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY) \
+		-e AWS_SESSION_TOKEN=$(AWS_SESSION_TOKEN) \
+		-e AWS_REGION=$(AWS_REGION) \
+		$(TF_PROD_IMAGE) workspace select prod
 
 tf-prod-plan: tf-prod-init
 	@echo "Planning Terraform changes for production..."

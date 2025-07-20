@@ -4,7 +4,7 @@ create_s3_bucket     = false
 create_dns_resources = false  # Set to true when you have a Route53 hosted zone for your domain
 s3_bucket_name       = "area51dapidi"
 s3_bucket_prefix     = "simple-website"
-domain_name          = "simple-website.example.com"  # Replace with your actual domain
+domain_name          = "joseserver.com"  # Replace with your actual domain
 use_ssl              = true
 aws_region           = "us-east-1"
 

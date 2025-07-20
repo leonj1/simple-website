@@ -1,6 +1,6 @@
 # CloudFront Origin Access Control
 resource "aws_cloudfront_origin_access_control" "website" {
-  name                              = "${var.s3_bucket_id}-oac"
+  name                              = "${var.s3_bucket_id}-${var.environment}-oac"
   description                       = "OAC for ${var.domain_name}"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
