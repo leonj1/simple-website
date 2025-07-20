@@ -124,6 +124,8 @@ jobs:
     needs: version-and-tag
     runs-on: ubuntu-latest
     if: needs.version-and-tag.outputs.new_tag
+    outputs:
+      artifact_name: simple-website-${{ needs.version-and-tag.outputs.new_tag }}.zip
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -169,11 +171,78 @@ jobs:
           
           make docker-zip VERSION=$VERSION
 
+      - name: Rename artifact for S3
+        run: |
+          mv "dark-theme-landing-${{ needs.version-and-tag.outputs.new_tag }}.zip" "simple-website-${{ needs.version-and-tag.outputs.new_tag }}.zip"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Upload artifact to S3
+        run: |
+          ARTIFACT_NAME="simple-website-${{ needs.version-and-tag.outputs.new_tag }}.zip"
+          PREFIX="${{ secrets.AWS_S3_PREFIX }}"
+          
+          # Ensure prefix ends with / if it exists and doesn't already
+          if [ -n "$PREFIX" ] && [[ ! "$PREFIX" =~ /$ ]]; then
+            PREFIX="${PREFIX}/"
+          fi
+          
+          S3_PATH="s3://${{ secrets.AWS_S3_BUCKET }}/${PREFIX}${ARTIFACT_NAME}"
+          
+          echo "Uploading ${ARTIFACT_NAME} to S3..."
+          echo "Full S3 path: ${S3_PATH}"
+          aws s3 cp "${ARTIFACT_NAME}" "${S3_PATH}" \
+            --metadata "version=${{ needs.version-and-tag.outputs.new_tag }},build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ),github-run-id=${{ github.run_id }}"
+          
+          echo "✓ Upload complete: ${S3_PATH}"
+
+      - name: List and cleanup old artifacts
+        run: |
+          PREFIX="${{ secrets.AWS_S3_PREFIX }}"
+          BUCKET="${{ secrets.AWS_S3_BUCKET }}"
+          
+          # Ensure prefix ends with / if it exists and doesn't already
+          if [ -n "$PREFIX" ] && [[ ! "$PREFIX" =~ /$ ]]; then
+            PREFIX="${PREFIX}/"
+          fi
+          
+          echo "Listing artifacts in s3://${BUCKET}/${PREFIX}"
+          
+          # List all artifacts, sort by date (newest first), and get all but the 5 most recent
+          aws s3api list-objects-v2 \
+            --bucket "${BUCKET}" \
+            --prefix "${PREFIX}simple-website-" \
+            --query "reverse(sort_by(Contents[?ends_with(Key, '.zip')], &LastModified))[5:].Key" \
+            --output text | tr '\t' '\n' > artifacts-to-delete.txt
+          
+          # Check if there are artifacts to delete
+          if [ -s artifacts-to-delete.txt ]; then
+            echo "Artifacts to delete:"
+            cat artifacts-to-delete.txt
+            
+            # Delete old artifacts
+            while IFS= read -r key; do
+              if [ -n "$key" ]; then
+                echo "Deleting: $key"
+                aws s3 rm "s3://${BUCKET}/${key}"
+              fi
+            done < artifacts-to-delete.txt
+            
+            echo "✓ Cleanup complete"
+          else
+            echo "No artifacts to delete (keeping 5 most recent)"
+          fi
+
       - name: Upload artifact to release
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ needs.version-and-tag.outputs.new_tag }}
-          artifacts: "dark-theme-landing-${{ needs.version-and-tag.outputs.new_tag }}.zip"
+          artifacts: "simple-website-${{ needs.version-and-tag.outputs.new_tag }}.zip"
           artifactContentType: application/zip
           allowUpdates: true
           omitBody: true
