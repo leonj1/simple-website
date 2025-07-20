@@ -3,7 +3,8 @@
 PROJECT_NAME = dark-theme-landing
 BUILD_DIR = build
 DIST_FILE = $(PROJECT_NAME).zip
-PROJECT_ZIP = $(PROJECT_NAME)-source.zip
+VERSION ?= latest
+PROJECT_ZIP = $(PROJECT_NAME)-$(VERSION).zip
 
 install:
 	npm install
@@ -34,7 +35,7 @@ zip:
 
 docker-zip:
 	@echo "Building Docker image for zip..."
-	@docker build -f Dockerfile.zip -t project-zipper .
-	@echo "Running zip in container..."
-	@docker run --rm -v "$(PWD):/output" project-zipper
+	@docker build -f Dockerfile.zip -t project-zipper --build-arg VERSION=$(VERSION) .
+	@echo "Running zip in container with version $(VERSION)..."
+	@docker run --rm -v "$(PWD):/output" -e VERSION=$(VERSION) project-zipper
 	@echo "Zip file created: $(PROJECT_ZIP)"

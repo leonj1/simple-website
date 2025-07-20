@@ -12,6 +12,9 @@ permissions:
 jobs:
   version-and-tag:
     runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.version.outputs.new_tag }}
+      new_version: ${{ steps.version.outputs.new_version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -116,3 +119,30 @@ jobs:
             git commit -m "chore: bump version to ${{ steps.version.outputs.new_tag }} [skip ci]"
             git push origin main
           fi
+
+  create-zip-artifact:
+    needs: version-and-tag
+    runs-on: ubuntu-latest
+    if: needs.version-and-tag.outputs.new_tag
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version-and-tag.outputs.new_tag }}
+
+      - name: Create zip artifact
+        run: |
+          VERSION="${{ needs.version-and-tag.outputs.new_tag }}"
+          echo "Creating zip artifact with version: $VERSION"
+          make docker-zip VERSION=$VERSION
+
+      - name: Upload artifact to release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ needs.version-and-tag.outputs.new_tag }}
+          artifacts: "dark-theme-landing-${{ needs.version-and-tag.outputs.new_tag }}.zip"
+          artifactContentType: application/zip
+          allowUpdates: true
+          omitBody: true
+          omitName: true
+          token: ${{ secrets.GITHUB_TOKEN }}
