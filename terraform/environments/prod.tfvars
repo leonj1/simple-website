@@ -1,10 +1,10 @@
 # Production environment configuration
 environment          = "production"
 create_s3_bucket     = false
-create_dns_resources = false  # Set to true when you have a Route53 hosted zone for your domain
+create_dns_resources = true  # Enable Route53 and ACM resources
 s3_bucket_name       = "area51dapidi"
 s3_bucket_prefix     = "simple-website"
-domain_name          = "joseserver.com"  # Replace with your actual domain
+domain_name          = "website.joseserver.com"  # Subdomain for the website
 use_ssl              = true
 aws_region           = "us-east-1"
 

@@ -21,6 +21,7 @@ module "dns" {
 
   environment        = var.environment
   domain_name        = var.domain_name
+  root_domain        = local.root_domain
   create_certificate = local.create_acm_certificate
   tags               = var.tags
 }
@@ -63,16 +64,31 @@ resource "aws_route53_record" "website" {
   }
 }
 
-# Route53 A record for www subdomain (production only with DNS resources)
-resource "aws_route53_record" "www" {
-  count   = var.environment == "production" && var.create_dns_resources ? 1 : 0
-  zone_id = module.dns.zone_id
-  name    = "www.${var.domain_name}"
-  type    = "A"
 
-  alias {
-    name                   = module.cloudfront.distribution_domain_name
-    zone_id                = module.cloudfront.distribution_hosted_zone_id
-    evaluate_target_health = false
-  }
+# S3 bucket policy for existing bucket in production
+resource "aws_s3_bucket_policy" "existing_bucket" {
+  count  = var.environment == "production" && !var.create_s3_bucket ? 1 : 0
+  bucket = var.s3_bucket_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowCloudFrontOAC"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }
+        Action   = "s3:GetObject"
+        Resource = "arn:aws:s3:::${var.s3_bucket_name}/${var.s3_bucket_prefix}/${var.website_version}/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = module.cloudfront.distribution_arn
+          }
+        }
+      }
+    ]
+  })
+
+  depends_on = [module.cloudfront]
 }

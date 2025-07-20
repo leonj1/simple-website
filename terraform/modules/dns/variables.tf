@@ -8,6 +8,11 @@ variable "domain_name" {
   type        = string
 }
 
+variable "root_domain" {
+  description = "Root domain for Route53 zone lookup"
+  type        = string
+}
+
 variable "create_certificate" {
   description = "Whether to create ACM certificate"
   type        = bool

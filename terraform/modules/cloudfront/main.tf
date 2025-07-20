@@ -43,6 +43,9 @@ resource "aws_cloudfront_distribution" "website" {
     min_ttl     = 0
     default_ttl = var.default_ttl
     max_ttl     = var.max_ttl
+
+    # Security headers via response headers policy
+    response_headers_policy_id = var.environment == "production" ? aws_cloudfront_response_headers_policy.security_headers[0].id : null
   }
 
   # Custom error responses
@@ -88,4 +91,54 @@ resource "aws_cloudfront_distribution" "website" {
   tags = merge(var.tags, {
     Name = "${var.domain_name}-distribution"
   })
+}
+
+# CloudFront Response Headers Policy for security headers
+resource "aws_cloudfront_response_headers_policy" "security_headers" {
+  count   = var.environment == "production" ? 1 : 0
+  name    = "${var.s3_bucket_id}-${var.environment}-security-headers"
+  comment = "Security headers for ${var.domain_name}"
+
+  security_headers_config {
+    content_type_options {
+      override = true
+    }
+
+    frame_options {
+      frame_option = "DENY"
+      override     = true
+    }
+
+    referrer_policy {
+      referrer_policy = "strict-origin-when-cross-origin"
+      override        = true
+    }
+
+    xss_protection {
+      mode_block = true
+      protection = true
+      override   = true
+    }
+
+    strict_transport_security {
+      access_control_max_age_sec = 63072000
+      include_subdomains         = true
+      preload                    = true
+      override                   = true
+    }
+  }
+
+  custom_headers_config {
+    items {
+      header   = "X-Permitted-Cross-Domain-Policies"
+      value    = "none"
+      override = true
+    }
+
+    items {
+      header   = "Permissions-Policy"
+      value    = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+      override = true
+    }
+  }
 }

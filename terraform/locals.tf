@@ -10,6 +10,11 @@ locals {
   # For production, use the actual domain
   website_domain = var.environment == "local" ? "${replace(var.domain_name, ".", "-")}.localhost.localstack.cloud" : var.domain_name
   
+  # Extract root domain from subdomain (e.g., "website.joseserver.com" -> "joseserver.com")
+  # This assumes a single subdomain level
+  domain_parts = split(".", var.domain_name)
+  root_domain = var.environment == "production" && length(local.domain_parts) > 2 ? join(".", slice(local.domain_parts, 1, length(local.domain_parts))) : var.domain_name
+  
   # ACM configuration - only create in production with DNS resources
   create_acm_certificate = var.environment == "production" && var.use_ssl && var.create_dns_resources
   

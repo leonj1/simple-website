@@ -12,7 +12,7 @@ terraform {
 # Data source for existing Route53 hosted zone
 data "aws_route53_zone" "main" {
   count        = var.environment == "production" && var.create_certificate ? 1 : 0
-  name         = var.domain_name
+  name         = var.root_domain
   private_zone = false
 }
 
@@ -21,11 +21,11 @@ resource "aws_acm_certificate" "website" {
   provider = aws.acm_provider
   count    = var.create_certificate ? 1 : 0
 
-  domain_name       = var.domain_name
+  domain_name       = var.root_domain
   validation_method = "DNS"
 
   subject_alternative_names = [
-    "www.${var.domain_name}"
+    "*.${var.root_domain}"
   ]
 
   lifecycle {
@@ -33,7 +33,7 @@ resource "aws_acm_certificate" "website" {
   }
 
   tags = merge(var.tags, {
-    Name = "${var.domain_name}-certificate"
+    Name = "${var.root_domain}-certificate"
   })
 }
 
