@@ -11,7 +11,7 @@ terraform {
 
 # Data source for existing Route53 hosted zone
 data "aws_route53_zone" "main" {
-  count        = var.environment == "production" ? 1 : 0
+  count        = var.environment == "production" && var.create_certificate ? 1 : 0
   name         = var.domain_name
   private_zone = false
 }

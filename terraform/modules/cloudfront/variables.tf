@@ -70,3 +70,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "website_version" {
+  description = "Website version to serve"
+  type        = string
+  default     = "latest"
+}

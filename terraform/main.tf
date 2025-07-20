@@ -41,6 +41,7 @@ module "cloudfront" {
   max_ttl               = var.cloudfront_max_ttl
   index_document        = var.index_document
   error_document        = var.error_document
+  website_version       = var.website_version
   tags                  = var.tags
 
   depends_on = [
@@ -48,9 +49,9 @@ module "cloudfront" {
   ]
 }
 
-# Route53 A record for CloudFront distribution (production only)
+# Route53 A record for CloudFront distribution (production only with DNS resources)
 resource "aws_route53_record" "website" {
-  count   = var.environment == "production" ? 1 : 0
+  count   = var.environment == "production" && var.create_dns_resources ? 1 : 0
   zone_id = module.dns.zone_id
   name    = var.domain_name
   type    = "A"
@@ -62,9 +63,9 @@ resource "aws_route53_record" "website" {
   }
 }
 
-# Route53 A record for www subdomain (production only)
+# Route53 A record for www subdomain (production only with DNS resources)
 resource "aws_route53_record" "www" {
-  count   = var.environment == "production" ? 1 : 0
+  count   = var.environment == "production" && var.create_dns_resources ? 1 : 0
   zone_id = module.dns.zone_id
   name    = "www.${var.domain_name}"
   type    = "A"

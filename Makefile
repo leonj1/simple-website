@@ -1,4 +1,4 @@
-.PHONY: build clean install start zip docker-zip tf-build tf-init tf-plan tf-apply tf-destroy tf-shell tf-output
+.PHONY: build clean install start zip docker-zip tf-build tf-init tf-plan tf-apply tf-destroy tf-shell tf-output tf-prod-build tf-prod-init tf-prod-plan tf-prod-apply tf-prod-destroy
 
 PROJECT_NAME = dark-theme-landing
 BUILD_DIR = build
@@ -58,6 +58,10 @@ TF_IMAGE = terraform-local
 TF_VARS = -var-file=environments/local.tfvars
 LOCALSTACK_NETWORK = localstack-network
 
+# Production Terraform configuration
+TF_PROD_VARS = -var-file=environments/prod.tfvars
+TF_PROD_IMAGE = terraform-prod
+
 # Terraform targets
 tf-build:
 	@echo "Building Terraform Docker image..."
@@ -115,3 +119,51 @@ tf-output: tf-build
 		-v "$(PWD)/$(TF_DIR):/workspace" \
 		-e LOCALSTACK_AUTH_TOKEN=$(LOCALSTACK_AUTH_TOKEN) \
 		$(TF_IMAGE) output -json
+
+# Production Terraform targets
+tf-prod-build:
+	@echo "Building Terraform Docker image for production..."
+	@docker build -f Dockerfile.terraform.prod -t $(TF_PROD_IMAGE) .
+
+tf-prod-init: tf-prod-build
+	@echo "Initializing Terraform for production..."
+	@docker run --rm \
+		-v "$(PWD)/$(TF_DIR):/workspace" \
+		-e AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) \
+		-e AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY) \
+		-e AWS_SESSION_TOKEN=$(AWS_SESSION_TOKEN) \
+		-e AWS_REGION=$(AWS_REGION) \
+		$(TF_PROD_IMAGE) init
+
+tf-prod-plan: tf-prod-init
+	@echo "Planning Terraform changes for production..."
+	@docker run --rm \
+		-v "$(PWD)/$(TF_DIR):/workspace" \
+		-e AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) \
+		-e AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY) \
+		-e AWS_SESSION_TOKEN=$(AWS_SESSION_TOKEN) \
+		-e AWS_REGION=$(AWS_REGION) \
+		$(TF_PROD_IMAGE) plan $(TF_PROD_VARS)
+
+tf-prod-apply: tf-prod-init
+	@echo "Applying Terraform changes to production..."
+	@echo "WARNING: This will make changes to production AWS resources!"
+	@docker run --rm \
+		-v "$(PWD)/$(TF_DIR):/workspace" \
+		-e AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) \
+		-e AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY) \
+		-e AWS_SESSION_TOKEN=$(AWS_SESSION_TOKEN) \
+		-e AWS_REGION=$(AWS_REGION) \
+		$(TF_PROD_IMAGE) apply $(TF_PROD_VARS) -auto-approve
+
+tf-prod-destroy: tf-prod-build
+	@echo "WARNING: This will DESTROY production AWS resources!"
+	@echo "Press Ctrl+C to cancel..."
+	@sleep 5
+	@docker run --rm \
+		-v "$(PWD)/$(TF_DIR):/workspace" \
+		-e AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID) \
+		-e AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY) \
+		-e AWS_SESSION_TOKEN=$(AWS_SESSION_TOKEN) \
+		-e AWS_REGION=$(AWS_REGION) \
+		$(TF_PROD_IMAGE) destroy $(TF_PROD_VARS) -auto-approve

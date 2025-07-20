@@ -1,6 +1,7 @@
 # Production environment configuration
 environment          = "production"
 create_s3_bucket     = false
+create_dns_resources = false  # Set to true when you have a Route53 hosted zone for your domain
 s3_bucket_name       = "area51dapidi"
 s3_bucket_prefix     = "simple-website"
 domain_name          = "simple-website.example.com"  # Replace with your actual domain
@@ -15,6 +16,7 @@ cloudfront_max_ttl     = 86400
 # Website files
 index_document = "index.html"
 error_document = "error.html"
+website_version = "v1.0.0"  # Update this to deploy a specific version
 
 # Tags
 tags = {

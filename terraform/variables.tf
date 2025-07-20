@@ -13,6 +13,12 @@ variable "create_s3_bucket" {
   default     = false
 }
 
+variable "create_dns_resources" {
+  description = "Whether to create Route53 and ACM resources (set to false if you don't have a domain yet)"
+  type        = bool
+  default     = true
+}
+
 variable "s3_bucket_name" {
   description = "Name of the S3 bucket"
   type        = string
@@ -85,4 +91,10 @@ variable "error_document" {
   description = "Error document for the website"
   type        = string
   default     = "error.html"
+}
+
+variable "website_version" {
+  description = "Version of the website to deploy (e.g., v1.2.3)"
+  type        = string
+  default     = "latest"
 }

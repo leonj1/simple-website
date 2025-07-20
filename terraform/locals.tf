@@ -10,8 +10,8 @@ locals {
   # For production, use the actual domain
   website_domain = var.environment == "local" ? "${replace(var.domain_name, ".", "-")}.localhost.localstack.cloud" : var.domain_name
   
-  # ACM configuration - only create in production
-  create_acm_certificate = var.environment == "production" && var.use_ssl
+  # ACM configuration - only create in production with DNS resources
+  create_acm_certificate = var.environment == "production" && var.use_ssl && var.create_dns_resources
   
   # S3 website endpoint
   s3_website_endpoint = var.environment == "local" ? "${var.s3_bucket_name}.s3-website.localhost.localstack.cloud" : "${var.s3_bucket_name}.s3-website-${var.aws_region}.amazonaws.com"

@@ -20,7 +20,7 @@ output "cloudfront_domain_name" {
 
 output "website_url" {
   description = "Website URL"
-  value       = var.use_ssl ? "https://${local.website_domain}" : "http://${local.website_domain}"
+  value       = var.create_dns_resources && var.environment == "production" ? (var.use_ssl ? "https://${var.domain_name}" : "http://${var.domain_name}") : "https://${module.cloudfront.distribution_domain_name}"
 }
 
 output "route53_zone_id" {
@@ -35,10 +35,20 @@ output "acm_certificate_arn" {
 
 output "website_dns_name" {
   description = "Website DNS record name"
-  value       = var.environment == "production" ? aws_route53_record.website[0].name : ""
+  value       = var.environment == "production" && var.create_dns_resources ? aws_route53_record.website[0].name : ""
 }
 
 output "website_dns_fqdn" {
   description = "Website DNS record FQDN"
-  value       = var.environment == "production" ? aws_route53_record.website[0].fqdn : ""
+  value       = var.environment == "production" && var.create_dns_resources ? aws_route53_record.website[0].fqdn : ""
+}
+
+output "website_version" {
+  description = "Currently deployed website version"
+  value       = var.website_version
+}
+
+output "s3_website_path" {
+  description = "S3 path where website files should be uploaded"
+  value       = "s3://${var.s3_bucket_name}/${var.s3_bucket_prefix}/${var.website_version}/"
 }

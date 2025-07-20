@@ -1,0 +1,22 @@
+FROM hashicorp/terraform:1.7.0
+
+# Install required tools
+RUN apk add --no-cache \
+    curl \
+    bash \
+    jq \
+    python3 \
+    py3-pip \
+    aws-cli
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy terraform files
+COPY terraform/ /workspace/
+
+# No hardcoded AWS credentials for production
+# They will be passed via environment variables
+
+# Entry point
+ENTRYPOINT ["terraform"]

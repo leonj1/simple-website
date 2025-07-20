@@ -1,6 +1,6 @@
 output "zone_id" {
   description = "Route53 hosted zone ID"
-  value       = try(data.aws_route53_zone.main[0].zone_id, "")
+  value       = var.create_certificate ? try(data.aws_route53_zone.main[0].zone_id, "") : ""
 }
 
 output "certificate_arn" {

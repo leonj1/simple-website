@@ -16,6 +16,7 @@ cloudfront_max_ttl     = 86400
 # Website files
 index_document = "index.html"
 error_document = "error.html"
+website_version = "latest"
 
 # Tags
 tags = {

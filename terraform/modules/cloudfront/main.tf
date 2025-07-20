@@ -19,7 +19,7 @@ resource "aws_cloudfront_distribution" "website" {
   origin {
     domain_name              = var.s3_bucket_domain_name
     origin_id                = "S3-${var.s3_bucket_id}"
-    origin_path              = "/${var.s3_bucket_prefix}"
+    origin_path              = "/${var.s3_bucket_prefix}/${var.website_version}"
     origin_access_control_id = aws_cloudfront_origin_access_control.website.id
   }
 
@@ -61,7 +61,7 @@ resource "aws_cloudfront_distribution" "website" {
   }
 
   # Aliases (alternate domain names)
-  aliases = var.environment == "production" && var.domain_name != "" ? [var.domain_name] : []
+  aliases = var.environment == "production" && var.domain_name != "" && var.acm_certificate_arn != "" ? [var.domain_name] : []
 
   # SSL/TLS certificate
   viewer_certificate {
