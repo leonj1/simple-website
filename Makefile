@@ -1,4 +1,4 @@
-.PHONY: build clean install start zip docker-zip
+.PHONY: build clean install start zip docker-zip tf-build tf-init tf-plan tf-apply tf-destroy tf-shell tf-output
 
 PROJECT_NAME = dark-theme-landing
 BUILD_DIR = build
@@ -39,3 +39,79 @@ docker-zip:
 	@echo "Running zip in container with version $(VERSION)..."
 	@docker run --rm -v "$(PWD):/output" -e VERSION=$(VERSION) project-zipper
 	@echo "Zip file created: $(PROJECT_ZIP)"
+
+localstack-up:
+	docker compose up -d
+
+localstack-down: tf-destroy
+	@echo "Destroying Terraform resources (if any)..."
+	-@$(MAKE) tf-destroy 2>/dev/null || true
+	@echo "Stopping LocalStack..."
+	docker compose down -v
+
+localstack-logs:
+	docker compose logs
+
+# Terraform configuration
+TF_DIR = terraform
+TF_IMAGE = terraform-local
+TF_VARS = -var-file=environments/local.tfvars
+LOCALSTACK_NETWORK = localstack-network
+
+# Terraform targets
+tf-build:
+	@echo "Building Terraform Docker image..."
+	@docker build -f Dockerfile.terraform -t $(TF_IMAGE) .
+
+tf-init: tf-build
+	@echo "Initializing Terraform..."
+	@docker run --rm \
+		--network $(LOCALSTACK_NETWORK) \
+		-v "$(PWD)/$(TF_DIR):/workspace" \
+		-e LOCALSTACK_AUTH_TOKEN=$(LOCALSTACK_AUTH_TOKEN) \
+		$(TF_IMAGE) init
+
+tf-plan: tf-init
+	@echo "Planning Terraform changes..."
+	@docker run --rm \
+		--network $(LOCALSTACK_NETWORK) \
+		-v "$(PWD)/$(TF_DIR):/workspace" \
+		-e LOCALSTACK_AUTH_TOKEN=$(LOCALSTACK_AUTH_TOKEN) \
+		$(TF_IMAGE) plan $(TF_VARS)
+
+tf-apply: tf-init tf-build
+	@echo "Applying Terraform changes..."
+	@docker run --rm \
+		--network $(LOCALSTACK_NETWORK) \
+		-v "$(PWD)/$(TF_DIR):/workspace" \
+		-e LOCALSTACK_AUTH_TOKEN=$(LOCALSTACK_AUTH_TOKEN) \
+		$(TF_IMAGE) apply $(TF_VARS) -auto-approve
+
+tf-destroy: tf-build
+	@echo "Destroying Terraform resources..."
+	@if [ -f "$(TF_DIR)/terraform.tfstate" ]; then \
+		docker run --rm \
+			--network $(LOCALSTACK_NETWORK) \
+			-v "$(PWD)/$(TF_DIR):/workspace" \
+			-e LOCALSTACK_AUTH_TOKEN=$(LOCALSTACK_AUTH_TOKEN) \
+			$(TF_IMAGE) destroy $(TF_VARS) -auto-approve; \
+	else \
+		echo "No terraform state found, skipping destroy"; \
+	fi
+
+tf-shell: tf-build
+	@echo "Opening Terraform shell..."
+	@docker run --rm -it \
+		--network $(LOCALSTACK_NETWORK) \
+		-v "$(PWD)/$(TF_DIR):/workspace" \
+		-e LOCALSTACK_AUTH_TOKEN=$(LOCALSTACK_AUTH_TOKEN) \
+		--entrypoint /bin/bash \
+		$(TF_IMAGE)
+
+tf-output: tf-build
+	@echo "Showing Terraform outputs..."
+	@docker run --rm \
+		--network $(LOCALSTACK_NETWORK) \
+		-v "$(PWD)/$(TF_DIR):/workspace" \
+		-e LOCALSTACK_AUTH_TOKEN=$(LOCALSTACK_AUTH_TOKEN) \
+		$(TF_IMAGE) output -json

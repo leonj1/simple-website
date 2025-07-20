@@ -1,0 +1,25 @@
+FROM hashicorp/terraform:1.7.0
+
+# Install required tools
+RUN apk add --no-cache \
+    curl \
+    bash \
+    jq \
+    python3 \
+    py3-pip \
+    aws-cli
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy terraform files
+COPY terraform/ /workspace/
+
+# Set environment variables for LocalStack
+ENV AWS_ACCESS_KEY_ID=test
+ENV AWS_SECRET_ACCESS_KEY=test
+ENV AWS_DEFAULT_REGION=us-east-1
+ENV AWS_S3_USE_PATH_STYLE=true
+
+# Entry point
+ENTRYPOINT ["terraform"]

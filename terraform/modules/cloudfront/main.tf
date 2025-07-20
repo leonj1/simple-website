@@ -1,0 +1,91 @@
+# CloudFront Origin Access Control
+resource "aws_cloudfront_origin_access_control" "website" {
+  name                              = "${var.s3_bucket_id}-oac"
+  description                       = "OAC for ${var.domain_name}"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+# CloudFront Distribution
+resource "aws_cloudfront_distribution" "website" {
+  enabled             = true
+  is_ipv6_enabled     = true
+  comment             = "CloudFront distribution for ${var.domain_name}"
+  default_root_object = var.index_document
+  price_class         = var.price_class
+
+  # Origin configuration for S3
+  origin {
+    domain_name              = var.s3_bucket_domain_name
+    origin_id                = "S3-${var.s3_bucket_id}"
+    origin_path              = "/${var.s3_bucket_prefix}"
+    origin_access_control_id = aws_cloudfront_origin_access_control.website.id
+  }
+
+  # Default cache behavior
+  default_cache_behavior {
+    target_origin_id       = "S3-${var.s3_bucket_id}"
+    viewer_protocol_policy = var.use_ssl ? "redirect-to-https" : "allow-all"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+
+    forwarded_values {
+      query_string = false
+      headers      = []
+      
+      cookies {
+        forward = "none"
+      }
+    }
+
+    min_ttl     = 0
+    default_ttl = var.default_ttl
+    max_ttl     = var.max_ttl
+  }
+
+  # Custom error responses
+  custom_error_response {
+    error_code            = 404
+    error_caching_min_ttl = 300
+    response_code         = 200
+    response_page_path    = "/${var.index_document}"
+  }
+
+  custom_error_response {
+    error_code            = 403
+    error_caching_min_ttl = 300
+    response_code         = 200
+    response_page_path    = "/${var.index_document}"
+  }
+
+  # Aliases (alternate domain names)
+  aliases = var.environment == "production" && var.domain_name != "" ? [var.domain_name] : []
+
+  # SSL/TLS certificate
+  viewer_certificate {
+    cloudfront_default_certificate = var.environment == "local" || var.acm_certificate_arn == ""
+    acm_certificate_arn            = var.environment == "production" && var.acm_certificate_arn != "" ? var.acm_certificate_arn : null
+    ssl_support_method             = var.environment == "production" && var.acm_certificate_arn != "" ? "sni-only" : null
+    minimum_protocol_version       = var.environment == "production" ? "TLSv1.2_2021" : null
+  }
+
+  # Geo restrictions
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+
+  # Logging configuration (optional)
+  # logging_config {
+  #   include_cookies = false
+  #   bucket          = "${var.s3_bucket_id}.s3.amazonaws.com"
+  #   prefix          = "cloudfront-logs/"
+  # }
+
+  tags = merge(var.tags, {
+    Name = "${var.domain_name}-distribution"
+  })
+}
