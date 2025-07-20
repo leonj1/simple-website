@@ -50,13 +50,32 @@ jobs:
           custom_tag: ${{ steps.version.outputs.new_tag }}
           tag_prefix: v
 
+      - name: Check if this is first release
+        id: check_previous_tag
+        run: |
+          if [ -z "${{ steps.version.outputs.previous_tag }}" ]; then
+            echo "is_first_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_first_release=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Generate changelog
         id: changelog
+        if: steps.check_previous_tag.outputs.is_first_release == 'false'
         uses: requarks/changelog-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.version.outputs.new_tag }}
           excludeTypes: build,docs,style,other
+
+      - name: Get commits for first release
+        id: first_release_commits
+        if: steps.check_previous_tag.outputs.is_first_release == 'true'
+        run: |
+          COMMITS=$(git log --pretty=format:"- %s" --reverse)
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
         if: steps.version.outputs.new_tag
@@ -66,9 +85,9 @@ jobs:
           name: Release ${{ steps.version.outputs.new_tag }}
           body: |
             ## What's Changed
-            ${{ steps.changelog.outputs.changes }}
+            ${{ steps.check_previous_tag.outputs.is_first_release == 'true' && steps.first_release_commits.outputs.commits || steps.changelog.outputs.changes }}
             
-            **Full Changelog**: ${{ steps.version.outputs.previous_tag }}...${{ steps.version.outputs.new_tag }}
+            ${{ steps.check_previous_tag.outputs.is_first_release == 'false' && format('**Full Changelog**: {0}...{1}', steps.version.outputs.previous_tag, steps.version.outputs.new_tag) || '**Initial Release**' }}
           makeLatest: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
