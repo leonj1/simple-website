@@ -128,12 +128,45 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.version-and-tag.outputs.new_tag }}
+          fetch-depth: 0
 
       - name: Create zip artifact
         run: |
           VERSION="${{ needs.version-and-tag.outputs.new_tag }}"
           echo "Creating zip artifact with version: $VERSION"
+          
+          # Check if Dockerfile.zip exists
+          if [ ! -f "Dockerfile.zip" ]; then
+            echo "Dockerfile.zip not found. Creating it..."
+            cat > Dockerfile.zip << 'EOF'
+FROM alpine:latest
+
+# Install zip
+RUN apk add --no-cache zip
+
+# Accept version as build arg
+ARG VERSION=latest
+ENV VERSION=${VERSION}
+
+# Set working directory
+WORKDIR /workspace
+
+# Copy project files (excluding unwanted files)
+COPY . .
+
+# Create zip file with version in filename
+CMD sh -c "zip -r /output/dark-theme-landing-${VERSION}.zip . \
+     -x 'node_modules/*' \
+     -x 'build/*' \
+     -x '*.zip' \
+     -x '.git/*' \
+     -x '.gitignore' \
+     -x '*.log' \
+     -x '.DS_Store' \
+     -x 'Dockerfile.zip'"
+EOF
+          fi
+          
           make docker-zip VERSION=$VERSION
 
       - name: Upload artifact to release
