@@ -138,33 +138,33 @@ jobs:
           # Check if Dockerfile.zip exists
           if [ ! -f "Dockerfile.zip" ]; then
             echo "Dockerfile.zip not found. Creating it..."
-            cat > Dockerfile.zip << 'EOF'
-FROM alpine:latest
-
-# Install zip
-RUN apk add --no-cache zip
-
-# Accept version as build arg
-ARG VERSION=latest
-ENV VERSION=${VERSION}
-
-# Set working directory
-WORKDIR /workspace
-
-# Copy project files (excluding unwanted files)
-COPY . .
-
-# Create zip file with version in filename
-CMD sh -c "zip -r /output/dark-theme-landing-${VERSION}.zip . \
-     -x 'node_modules/*' \
-     -x 'build/*' \
-     -x '*.zip' \
-     -x '.git/*' \
-     -x '.gitignore' \
-     -x '*.log' \
-     -x '.DS_Store' \
-     -x 'Dockerfile.zip'"
-EOF
+            cat > Dockerfile.zip << 'DOCKERFILE_EOF'
+          FROM alpine:latest
+          
+          # Install zip
+          RUN apk add --no-cache zip
+          
+          # Accept version as build arg
+          ARG VERSION=latest
+          ENV VERSION=${VERSION}
+          
+          # Set working directory
+          WORKDIR /workspace
+          
+          # Copy project files (excluding unwanted files)
+          COPY . .
+          
+          # Create zip file with version in filename
+          CMD sh -c "zip -r /output/dark-theme-landing-${VERSION}.zip . \
+               -x 'node_modules/*' \
+               -x 'build/*' \
+               -x '*.zip' \
+               -x '.git/*' \
+               -x '.gitignore' \
+               -x '*.log' \
+               -x '.DS_Store' \
+               -x 'Dockerfile.zip'"
+          DOCKERFILE_EOF
           fi
           
           make docker-zip VERSION=$VERSION
