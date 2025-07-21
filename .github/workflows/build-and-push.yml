@@ -120,7 +120,7 @@ jobs:
             git push origin main
           fi
 
-  create-zip-artifact:
+  zip-and-push:
     needs: version-and-tag
     runs-on: ubuntu-latest
     if: needs.version-and-tag.outputs.new_tag
