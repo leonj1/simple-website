@@ -16,7 +16,8 @@ cloudfront_max_ttl     = 86400
 # Website files
 index_document = "index.html"
 error_document = "error.html"
-website_version = "v1.0.0"  # Update this to deploy a specific version
+
+website_version = "v0.0.10"
 
 # Tags
 tags = {
