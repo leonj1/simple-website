@@ -1,6 +1,6 @@
 {
   "name": "dark-theme-landing",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
