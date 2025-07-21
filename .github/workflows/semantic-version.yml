@@ -185,7 +185,7 @@ jobs:
       - name: Build React application
         run: |
           echo "Building React application..."
-          npm ci
+          npm install
           npm run build
           
       - name: Upload website content to S3
