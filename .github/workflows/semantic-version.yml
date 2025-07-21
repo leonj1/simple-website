@@ -182,9 +182,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Upload artifact to S3
+      - name: Build React application
         run: |
-          ARTIFACT_NAME="simple-website-${{ needs.version-and-tag.outputs.new_tag }}.zip"
+          echo "Building React application..."
+          npm ci
+          npm run build
+          
+      - name: Upload website content to S3
+        run: |
+          VERSION="${{ needs.version-and-tag.outputs.new_tag }}"
           PREFIX="${{ secrets.AWS_S3_PREFIX }}"
           
           # Ensure prefix ends with / if it exists and doesn't already
@@ -192,14 +198,29 @@ jobs:
             PREFIX="${PREFIX}/"
           fi
           
-          S3_PATH="s3://${{ secrets.AWS_S3_BUCKET }}/${PREFIX}${ARTIFACT_NAME}"
+          # Upload the build directory contents to the versioned path
+          S3_PATH="s3://${{ secrets.AWS_S3_BUCKET }}/${PREFIX}${VERSION}/"
           
-          echo "Uploading ${ARTIFACT_NAME} to S3..."
+          echo "Uploading build contents to S3..."
           echo "Full S3 path: ${S3_PATH}"
-          aws s3 cp "${ARTIFACT_NAME}" "${S3_PATH}" \
-            --metadata "version=${{ needs.version-and-tag.outputs.new_tag }},build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ),github-run-id=${{ github.run_id }}"
           
-          echo "✓ Upload complete: ${S3_PATH}"
+          # Sync the build directory to S3
+          aws s3 sync build/ "${S3_PATH}" \
+            --delete \
+            --metadata "version=${VERSION},build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ),github-run-id=${{ github.run_id }}"
+          
+          echo "✓ Website content uploaded to: ${S3_PATH}"
+          
+          # Also upload the zip artifact to an archives folder for reference
+          ARTIFACT_NAME="simple-website-${VERSION}.zip"
+          ARCHIVE_PATH="s3://${{ secrets.AWS_S3_BUCKET }}/${PREFIX}archives/${ARTIFACT_NAME}"
+          
+          echo "Uploading zip archive for reference..."
+          echo "Archive path: ${ARCHIVE_PATH}"
+          aws s3 cp "${ARTIFACT_NAME}" "${ARCHIVE_PATH}" \
+            --metadata "version=${VERSION},build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ),github-run-id=${{ github.run_id }}"
+          
+          echo "✓ Archive uploaded to: ${ARCHIVE_PATH}"
 
       - name: List and cleanup old artifacts
         run: |
@@ -211,31 +232,63 @@ jobs:
             PREFIX="${PREFIX}/"
           fi
           
-          echo "Listing artifacts in s3://${BUCKET}/${PREFIX}"
+          echo "=== Cleaning up old website versions ==="
           
-          # List all artifacts, sort by date (newest first), and get all but the 5 most recent
+          # List all version directories (they start with 'v')
           aws s3api list-objects-v2 \
             --bucket "${BUCKET}" \
-            --prefix "${PREFIX}simple-website-" \
-            --query "reverse(sort_by(Contents[?ends_with(Key, '.zip')], &LastModified))[5:].Key" \
-            --output text | tr '\t' '\n' > artifacts-to-delete.txt
+            --prefix "${PREFIX}v" \
+            --delimiter "/" \
+            --query "CommonPrefixes[].Prefix" \
+            --output text | tr '\t' '\n' | sort -Vr > all-versions.txt
           
-          # Check if there are artifacts to delete
-          if [ -s artifacts-to-delete.txt ]; then
-            echo "Artifacts to delete:"
-            cat artifacts-to-delete.txt
+          # Keep only the 5 most recent versions
+          if [ -s all-versions.txt ]; then
+            tail -n +6 all-versions.txt > versions-to-delete.txt
             
-            # Delete old artifacts
+            if [ -s versions-to-delete.txt ]; then
+              echo "Website versions to delete:"
+              cat versions-to-delete.txt
+              
+              # Delete old version directories
+              while IFS= read -r prefix; do
+                if [ -n "$prefix" ]; then
+                  echo "Deleting version: $prefix"
+                  aws s3 rm "s3://${BUCKET}/${prefix}" --recursive
+                fi
+              done < versions-to-delete.txt
+              
+              echo "✓ Old website versions cleaned up"
+            else
+              echo "No old website versions to delete (keeping 5 most recent)"
+            fi
+          fi
+          
+          echo "=== Cleaning up old archive files ==="
+          
+          # Clean up old zip archives
+          aws s3api list-objects-v2 \
+            --bucket "${BUCKET}" \
+            --prefix "${PREFIX}archives/simple-website-" \
+            --query "reverse(sort_by(Contents[?ends_with(Key, '.zip')], &LastModified))[5:].Key" \
+            --output text | tr '\t' '\n' > archives-to-delete.txt
+          
+          # Check if there are archives to delete
+          if [ -s archives-to-delete.txt ] && [ "$(cat archives-to-delete.txt)" != "None" ]; then
+            echo "Archive files to delete:"
+            cat archives-to-delete.txt
+            
+            # Delete old archives
             while IFS= read -r key; do
-              if [ -n "$key" ]; then
-                echo "Deleting: $key"
+              if [ -n "$key" ] && [ "$key" != "None" ]; then
+                echo "Deleting archive: $key"
                 aws s3 rm "s3://${BUCKET}/${key}"
               fi
-            done < artifacts-to-delete.txt
+            done < archives-to-delete.txt
             
-            echo "✓ Cleanup complete"
+            echo "✓ Old archives cleaned up"
           else
-            echo "No artifacts to delete (keeping 5 most recent)"
+            echo "No old archives to delete (keeping 5 most recent)"
           fi
 
       - name: Upload artifact to release
